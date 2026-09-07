@@ -1,7 +1,9 @@
 # signlab_demo-media
 
-The video half of the SignCollect demo dataset: 40 MP4 files, 68MB, the raw and
-the post-processed cut of each of 20 studio takes.
+The video half of the SignCollect demo dataset: 292 files, 291MB. Twenty studio
+takes, each filmed from three or five camera angles, each angle held as a raw
+cut and - where production made one - a post-processed cut, and each cut as an
+MP4 with a JPG thumbnail beside it.
 
 **This is video of identifiable research participants.** Their faces are the
 content - these are sign language recordings, so the signer is visible
@@ -26,19 +28,31 @@ and not the canonical copy of anything.
 
     studioFilesMini/
       raw/<stem>.mp4     the camera cut
+      raw/<stem>.jpg     its thumbnail
       post/<stem>.mp4    the post-processed cut
+      post/<stem>.jpg    its thumbnail
+
+An angle is a file of its own with a numeric suffix of its own: M20260227_5998,
+L20260227_7582 and R20260227_0221 are the same recording from three cameras.
+The only place that mapping exists is the matched_transcriptions row, which
+names each angle in its own column (l_file, m_file, r_file, a_file, b_file), so
+it can never be guessed from a filename. A and B were filmed on thirteen of the
+twenty takes and post-processed on none of them, which is why those thirteen
+have raw files only - production is the same, and the interface falls back to
+the raw thumbnail by design.
 
 The paths are deliberately identical to production's, under
 `/web/gebarenoverleg_media/`. `signcollect-demovps/scripts/repos.tsv` maps this
 repository onto `/web/gebarenoverleg_media`, so a plain `rsync` of the checkout
-lands every file exactly where the interface looks for it. The 20 stems are
-listed in `signcollect-demovps/db/demo-media.txt`, which is what the SQL seed
-and this tree have to agree on.
+lands every file exactly where the interface looks for it. All 86 angles are listed in
+`signcollect-demovps/db/demo-media.txt` with the cuts each one has, and that
+list and this tree have to agree - the seed checks every line against the
+checkout, both extensions, and refuses to run if one is missing.
 
-The post cuts are additionally hard-linked into `/web/media_stub` by
-`scripts/seed-demo-data.sh`, because the `/media` alias on the demo host stands
-in for `media.signcollect.nl`, whose document root on production is that same
-`post/` directory.
+The post cuts, thumbnails included, are additionally hard-linked into
+`/web/media_stub` by `scripts/seed-demo-data.sh`, because the `/media` alias on
+the demo host stands in for `media.signcollect.nl`, whose document root on
+production is that same `post/` directory.
 
 ## Git history is permanent
 
@@ -65,7 +79,10 @@ Consequences, in the order they matter:
 
 Plain `git clone` has to keep working for anyone deploying the demo, on a
 machine that may not have `git-lfs` installed, and LFS objects are fetched
-through a separate quota'd endpoint that fails differently from git. 68MB of
-already-compressed video is a size a normal clone handles fine. It does not
-delta or repack, so it is 68MB once and forever - which is the real cost here,
-and it is the same cost with LFS. Not worth the extra moving part.
+through a separate quota'd endpoint that fails differently from git. 291MB is
+a slow clone, not a broken one, and it is a one-time cost per machine. The
+video does not delta or repack, so it is 291MB once and forever either way -
+LFS moves where the bytes are stored without making them any less permanent,
+and it would put a quota between a fresh checkout and a working demo, which is
+the property this whole arrangement exists to protect. Revisit it if this ever
+grows by another order of magnitude.
