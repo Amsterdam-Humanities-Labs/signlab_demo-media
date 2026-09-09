@@ -24,6 +24,64 @@ So: this exists so a demo can be seeded without production being reachable.
 That is its whole purpose. It is not an archive, not a distribution channel,
 and not the canonical copy of anything.
 
+The deploy toolchain is `interface_deploy/` inside
+`Amsterdam-Humanities-Labs/signlab_signcollect-stack`; every path named below
+as `scripts/…` or `db/…` is relative to that directory.
+
+### Rows and video are two halves of one seed
+
+`db/schema.sql` builds an empty database and `db/demo-user.sql` adds one login
+— enough to sign in and nothing else. `db/demo-data.sql` is the third layer:
+the actual rows, including the `matched_transcriptions` rows whose `l_file`,
+`m_file`, `r_file`, `a_file` and `b_file` columns name the files in this
+repository. **Those rows and these files are one dataset in two places.** Rows
+without the video give an interface where every list is populated and no player
+has a source; video without the rows is 291MB nothing points at.
+
+`db/demo-media.txt` is the contract between them: one line per angle, with the
+cuts each one has, kept as an explicit list rather than derived from the SQL so
+that `scripts/seed-demo-data.sh` never has to parse SQL to know what to check,
+and so a reviewer can see in one place exactly which recordings the demo
+carries. The seed checks every line against the deployed tree — both the `.mp4`
+and the `.jpg` — and refuses to run if one is missing. Adding an angle to the
+demo therefore means adding its files here **first**, then its line there.
+
+## Where it runs
+
+Nowhere, by itself — it is data, not code. It is deployed onto the demo hosts
+(`dev2`, docroot `/web`; `dev-1`, docroot `/srv/signcollect/web`) as
+`<docroot>/gebarenoverleg_media`, which is production's own path for the same
+tree.
+
+It is **not** deployed to the signcollect core server: production already has
+these files, and they came from there.
+
+## Status
+
+**Production** in the sense that a demo install depends on it and will fail
+loudly without it. It is not experimental and it is not scratch space.
+
+## How it is deployed
+
+By `scripts/repos.tsv`, exactly like a code component: the row
+`gebarenoverleg_media  signlab_demo-media  main` tells `scripts/host-bootstrap.sh`
+to clone this repository into `<docroot>/gebarenoverleg_media` on the host. The
+host clones it itself, over its own GitHub credentials — nothing passes through
+a workstation.
+
+That is a deliberate change from how it used to work. The media was once
+`rsync`ed out of production into a gitignored workstation cache and pushed from
+there, which made the deploy quietly dependent on `signcollect.nl` being
+reachable, and dependent in a way that was invisible while the cache was warm:
+a fresh checkout with production unreachable produced a fully populated
+interface in which no video played. The production fetch is gone rather than
+kept behind a flag. If this repository ever needs re-filling, that is a
+deliberate, reviewed copy into it — not a step of the install.
+
+Afterwards `scripts/seed-demo-data.sh` hard-links the post cuts into
+`/web/media_stub` (see Layout), and that is the only thing done to these files
+on the host.
+
 ## Layout
 
     studioFilesMini/
@@ -42,12 +100,15 @@ have raw files only - production is the same, and the interface falls back to
 the raw thumbnail by design.
 
 The paths are deliberately identical to production's, under
-`/web/gebarenoverleg_media/`. `signcollect-demovps/scripts/repos.tsv` maps this
-repository onto `/web/gebarenoverleg_media`, so a plain `rsync` of the checkout
-lands every file exactly where the interface looks for it. All 86 angles are listed in
-`signcollect-demovps/db/demo-media.txt` with the cuts each one has, and that
-list and this tree have to agree - the seed checks every line against the
-checkout, both extensions, and refuses to run if one is missing.
+`/web/gebarenoverleg_media/`. `scripts/repos.tsv` maps this repository onto
+`<docroot>/gebarenoverleg_media`, so an ordinary component clone lands every
+file exactly where the interface looks for it: `signCollect-v2`'s `js/main.js`
+and `js/table.js` build that URL straight from
+`matched_transcriptions.m_file`, and `signlab_zin`'s `getZinnen.php` hardcodes
+the same two prefixes. No special case, no path translation. All 86 angles are
+listed in `db/demo-media.txt` with the cuts each one has, and that list and
+this tree have to agree — the seed checks every line against the deployed tree,
+both extensions, and refuses to run if one is missing.
 
 The post cuts, thumbnails included, are additionally hard-linked into
 `/web/media_stub` by `scripts/seed-demo-data.sh`, because the `/media` alias on
@@ -86,3 +147,17 @@ LFS moves where the bytes are stored without making them any less permanent,
 and it would put a quota between a fresh checkout and a working demo, which is
 the property this whole arrangement exists to protect. Revisit it if this ever
 grows by another order of magnitude.
+
+## Dependencies
+
+- **`signlab_signcollect-stack`**, `interface_deploy/` — `scripts/repos.tsv`
+  places this tree, `db/demo-media.txt` says what must be in it, and
+  `scripts/seed-demo-data.sh` verifies it and makes the `/media` hard links.
+- **`db/demo-data.sql`** in that same toolchain — the rows that name these
+  files. Neither half is useful alone.
+- **`signlab_signCollect-v2`, `signlab_zin`, `signlab_studioIndex`** — the
+  components that build URLs into this tree. `studioIndex` is the one that
+  requests every angle's thumbnail on load, which is why the thumbnails and the
+  A/B angles are here and not only the M cut.
+
+Nothing here depends on anything: it has no code, no build, and no submodules.
