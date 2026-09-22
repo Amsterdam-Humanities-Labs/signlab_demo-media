@@ -1,88 +1,26 @@
 # signlab_demo-media
+The video half of the SignCollect demo dataset: 292 files, 291 MB (20 studio takes, 3 or 5 angles, raw + post cuts, each MP4 with a JPG thumbnail).
 
-The video half of the SignCollect demo dataset: 292 files, 291MB. Twenty studio
-takes, each filmed from three or five camera angles, each angle held as a raw
-cut and - where production made one - a post-processed cut, and each cut as an
-MP4 with a JPG thumbnail beside it.
+**This is video of identifiable research participants.** Signers are visible throughout and each take has its record id filmed in as a QR code. Treat it like the studio archive it came from. It is private and stays private.
 
-**This is video of identifiable research participants.** Their faces are the
-content - these are sign language recordings, so the signer is visible
-throughout, and every take carries a QR code with its record id filmed into the
-head of it. Treat this repository the way you would treat the studio archive it
-came out of. It is private, and it stays private.
-
-## What it is for
-
-`signcollect-demovps` stands a demo of the SignCollect interface up on a fresh
-VPS. Everything it needs comes from GitHub: the component repos, the vendored
-Apache config, the schema and the demo rows. This repository is the one
-remaining piece - without it the demo comes up with empty video players, and
-the only other place to get these files is the production server, which the
-demo host is deliberately firewalled away from.
-
-So: this exists so a demo can be seeded without production being reachable.
-That is its whole purpose. It is not an archive, not a distribution channel,
-and not the canonical copy of anything.
-
-The deploy toolchain is `interface_deploy/` inside
-`Amsterdam-Humanities-Labs/signlab_signcollect-stack`; every path named below
-as `scripts/…` or `db/…` is relative to that directory.
-
-### Rows and video are two halves of one seed
-
-`db/schema.sql` builds an empty database and `db/demo-user.sql` adds one login
-— enough to sign in and nothing else. `db/demo-data.sql` is the third layer:
-the actual rows, including the `matched_transcriptions` rows whose `l_file`,
-`m_file`, `r_file`, `a_file` and `b_file` columns name the files in this
-repository. **Those rows and these files are one dataset in two places.** Rows
-without the video give an interface where every list is populated and no player
-has a source; video without the rows is 291MB nothing points at.
-
-`db/demo-media.txt` is the contract between them: one line per angle, with the
-cuts each one has, kept as an explicit list rather than derived from the SQL so
-that `scripts/seed-demo-data.sh` never has to parse SQL to know what to check,
-and so a reviewer can see in one place exactly which recordings the demo
-carries. The seed checks every line against the deployed tree — both the `.mp4`
-and the `.jpg` — and refuses to run if one is missing. Adding an angle to the
-demo therefore means adding its files here **first**, then its line there.
+## What it does
+- Lets a demo host be seeded without reaching production (the demo is firewalled from it). Not an archive, not the canonical copy of anything.
+- Rows and video are one dataset in two places: `db/demo-data.sql` (`matched_transcriptions.l/m/r/a/b_file`) names these files.
+- `db/demo-media.txt` is the contract: one line per angle with its cuts. `scripts/seed-demo-data.sh` checks every `.mp4` and `.jpg` and refuses to run if one is missing. **Add files here first, then the line there.**
 
 ## Where it runs
-
-Nowhere, by itself — it is data, not code. It is deployed onto the demo hosts
-(`dev2`, docroot `/web`; `dev-1`, docroot `/srv/signcollect/web`) as
-`<docroot>/gebarenoverleg_media`, which is production's own path for the same
-tree.
-
-It is **not** deployed to the signcollect core server: production already has
-these files, and they came from there.
+Demo hosts only, as `<docroot>/gebarenoverleg_media` (dev2: `/web`, dev-1: `/srv/signcollect/web`), the same path as production.
+Not deployed to the core server: production already has these files.
 
 ## Status
+Production (a demo install fails loudly without it).
 
-**Production** in the sense that a demo install depends on it and will fail
-loudly without it. It is not experimental and it is not scratch space.
+## How to run / deploy
+Cloned by the host itself via `interface_deploy/scripts/repos.tsv` (`gebarenoverleg_media  signlab_demo-media  main`) in [signlab_signcollect-stack](https://github.com/Amsterdam-Humanities-Labs/signlab_signcollect-stack).
+`scripts/seed-demo-data.sh` then hard-links the post cuts into `/web/media_stub` (the demo's stand-in for `media.signcollect.nl`, whose docroot is `post/`). Nothing else touches these files.
+Re-filling this repo is a deliberate, reviewed copy, never an install step.
 
-## How it is deployed
-
-By `scripts/repos.tsv`, exactly like a code component: the row
-`gebarenoverleg_media  signlab_demo-media  main` tells `scripts/host-bootstrap.sh`
-to clone this repository into `<docroot>/gebarenoverleg_media` on the host. The
-host clones it itself, over its own GitHub credentials — nothing passes through
-a workstation.
-
-That is a deliberate change from how it used to work. The media was once
-`rsync`ed out of production into a gitignored workstation cache and pushed from
-there, which made the deploy quietly dependent on `signcollect.nl` being
-reachable, and dependent in a way that was invisible while the cache was warm:
-a fresh checkout with production unreachable produced a fully populated
-interface in which no video played. The production fetch is gone rather than
-kept behind a flag. If this repository ever needs re-filling, that is a
-deliberate, reviewed copy into it — not a step of the install.
-
-Afterwards `scripts/seed-demo-data.sh` hard-links the post cuts into
-`/web/media_stub` (see Layout), and that is the only thing done to these files
-on the host.
-
-## Layout
+Layout:
 
     studioFilesMini/
       raw/<stem>.mp4     the camera cut
@@ -90,74 +28,18 @@ on the host.
       post/<stem>.mp4    the post-processed cut
       post/<stem>.jpg    its thumbnail
 
-An angle is a file of its own with a numeric suffix of its own: M20260227_5998,
-L20260227_7582 and R20260227_0221 are the same recording from three cameras.
-The only place that mapping exists is the matched_transcriptions row, which
-names each angle in its own column (l_file, m_file, r_file, a_file, b_file), so
-it can never be guessed from a filename. A and B were filmed on thirteen of the
-twenty takes and post-processed on none of them, which is why those thirteen
-have raw files only - production is the same, and the interface falls back to
-the raw thumbnail by design.
+Each angle has its own stem (M20260227_5998, L20260227_7582 and R20260227_0221 are one recording); only the `matched_transcriptions` row maps them. A/B angles (13 of 20 takes) have raw cuts only, as on production.
 
-The paths are deliberately identical to production's, under
-`/web/gebarenoverleg_media/`. `scripts/repos.tsv` maps this repository onto
-`<docroot>/gebarenoverleg_media`, so an ordinary component clone lands every
-file exactly where the interface looks for it: `signCollect-v2`'s `js/main.js`
-and `js/table.js` build that URL straight from
-`matched_transcriptions.m_file`, and `signlab_zin`'s `getZinnen.php` hardcodes
-the same two prefixes. No special case, no path translation. All 86 angles are
-listed in `db/demo-media.txt` with the cuts each one has, and that list and
-this tree have to agree — the seed checks every line against the deployed tree,
-both extensions, and refuses to run if one is missing.
+## Configuration
+None. No code, no build, no submodules.
 
-The post cuts, thumbnails included, are additionally hard-linked into
-`/web/media_stub` by `scripts/seed-demo-data.sh`, because the `/media` alias on
-the demo host stands in for `media.signcollect.nl`, whose document root on
-production is that same `post/` directory.
+**History is permanent.** A removed file stays in every clone and in GitHub's storage; purging needs a history rewrite and still leaves old clones.
+- Only add a recording that may permanently be part of a demo dataset (studio consent is not consent to redistribution).
+- Add nothing else: no transcripts, exports, dumps, names, or anything pairing a recording with a person.
+- A participant withdrawal means purging history *and* every clone; treat the repo as compromised until done.
 
-## Git history is permanent
-
-Anything committed here cannot be withdrawn. A commit can be reverted, a branch
-can be deleted, a file can be removed from the tip of `main` - and the object is
-still in the pack, still fetched by the next `git clone`, still on every machine
-that has ever cloned this. Removing it for real means rewriting history and
-force-pushing, and even then it survives in every existing clone and in
-GitHub's own unreachable-object storage for some time.
-
-Consequences, in the order they matter:
-
-1. **Do not add a recording here unless it may permanently be part of a demo
-   dataset.** Consent to being recorded in the studio is not consent to being
-   redistributed in a checkout that gets cloned onto laptops and demo servers.
-2. **Do not add anything else at all.** No transcripts, no exports, no database
-   dumps, no participant names, no file that pairs a recording with a person.
-   The MP4s are the only content this repository is for.
-3. If a participant withdraws, the honest answer is that the file has to be
-   purged from history *and* from every clone, and this repository has to be
-   treated as compromised until that is done. Plan for that being expensive.
-
-## Why not Git LFS
-
-Plain `git clone` has to keep working for anyone deploying the demo, on a
-machine that may not have `git-lfs` installed, and LFS objects are fetched
-through a separate quota'd endpoint that fails differently from git. 291MB is
-a slow clone, not a broken one, and it is a one-time cost per machine. The
-video does not delta or repack, so it is 291MB once and forever either way -
-LFS moves where the bytes are stored without making them any less permanent,
-and it would put a quota between a fresh checkout and a working demo, which is
-the property this whole arrangement exists to protect. Revisit it if this ever
-grows by another order of magnitude.
+Not Git LFS: plain `git clone` must work without `git-lfs` or an LFS quota, and video does not delta, so LFS saves nothing. Revisit if it grows 10x.
 
 ## Dependencies
-
-- **`signlab_signcollect-stack`**, `interface_deploy/` — `scripts/repos.tsv`
-  places this tree, `db/demo-media.txt` says what must be in it, and
-  `scripts/seed-demo-data.sh` verifies it and makes the `/media` hard links.
-- **`db/demo-data.sql`** in that same toolchain — the rows that name these
-  files. Neither half is useful alone.
-- **`signlab_signCollect-v2`, `signlab_zin`, `signlab_studioIndex`** — the
-  components that build URLs into this tree. `studioIndex` is the one that
-  requests every angle's thumbnail on load, which is why the thumbnails and the
-  A/B angles are here and not only the M cut.
-
-Nothing here depends on anything: it has no code, no build, and no submodules.
+- `signlab_signcollect-stack` `interface_deploy/`: `repos.tsv`, `db/demo-media.txt`, `db/demo-data.sql`, `scripts/seed-demo-data.sh`.
+- Readers: `signlab_signCollect-v2` (`js/main.js`, `js/table.js`), `signlab_zin` (`getZinnen.php`), `signlab_studioIndex` (requests every angle's thumbnail, hence A/B and thumbnails are here).
